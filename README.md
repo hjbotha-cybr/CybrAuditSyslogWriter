@@ -24,7 +24,7 @@ If you need to run the script in a different context (e.g. interactively), you w
 Create config.ini and provide the following details:
 
 ## IdentityUrl
-The URL of your Identity tenant in format "https://<IdentityTenantID>.id.cyberark.cloud". This is the URL shown at the login page for your CyberArk tenant.
+The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberark.cloud`. This is the URL shown at the login page for your CyberArk tenant.
 
 ## ServiceUserUsername
 The username of an "OAuth2 Confidential Client" user created in Identity Administration (Core Services -> Users -> Add User -> Select "Is OAuth confidential client")
@@ -62,7 +62,7 @@ The directory where the script will store its current state between executions
 The API key of the SIEM integration created in the Audit service (CyberArk tenant -> Service Picker -> Audit -> SIEM Integrations)
 
 ## ApiBaseUrl
-The API base URL of your Audit service (e.g. https://SUBDOMAIN.audit.cyberark.cloud)
+The API base URL of your Audit service (e.g. `https://SUBDOMAIN.audit.cyberark.cloud`)
 
 ## LogLevel
 The log level of the tool. Valid values are "Info" and "Verbose"
