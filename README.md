@@ -29,7 +29,7 @@ The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberar
 ## ServiceUserUsername
 The username of an "OAuth2 Confidential Client" user created in Identity Administration (Core Services -> Users -> Add User -> Select "Is OAuth confidential client")
 
-## ServiceUserPasswordPlain=SecurePassword
+## ServiceUserPasswordPlain
 The password of that user in plain text. This will be automatically encrypted the first time the script runs.
 Encrypted passwords can only be decrypted by the user that encrypted it.
 
