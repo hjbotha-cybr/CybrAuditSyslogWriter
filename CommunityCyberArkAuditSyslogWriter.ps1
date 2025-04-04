@@ -598,14 +598,19 @@ If ($Result.data) {
     #Write-LogMessage -MSG "Sending:"
     #Write-LogMessage -MSG $SyslogString
     #Write-LogMessage -MSG "New Data: $SyslogString"
-    # and try to send it to the syslog receiver
-    $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString -SyslogReceiverProtocol $Config.SyslogReceiverProtocol -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation
-    If ($SyslogSendResult.Result) {
-        Write-LogMessage -MSG "$Count events sent to syslog. Updating cursor."
-        $CursorRef = $Result.paging.cursor.cursorRef
-        $StoreCursor = $true
+    try {
+        # and try to send it to the syslog receiver
+        $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString -SyslogReceiverProtocol $Config.SyslogReceiverProtocol -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation
+        If ($SyslogSendResult.Result) {
+            Write-LogMessage -MSG "$Count events sent to syslog. Updating cursor."
+            $CursorRef = $Result.paging.cursor.cursorRef
+            $StoreCursor = $true
+        }
+        else {
+            throw
+        }
     }
-    else {
+    catch {
         Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
         Write-LogMessage -type Error -MSG $SyslogSendResult.Details
         Write-LogMessage -type Error -MSG "Current cursorRef will be retained so the same logs can be retrieved again."
