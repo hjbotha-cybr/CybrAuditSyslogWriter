@@ -29,13 +29,6 @@ The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberar
 ## ServiceUserUsername
 The username of an "OAuth2 Confidential Client" user created in Identity Administration (Core Services -> Users -> Add User -> Select "Is OAuth confidential client")
 
-## ServiceUserPasswordPlain
-The password of that user in plain text. This will be automatically encrypted the first time the script runs.  
-Encrypted passwords can only be decrypted by the user that encrypted it.
-
-## SyslogReceiverAddress
-The hostname and port of your Syslog Receiver (Currently only supports plain text TCP)
-
 ## OAuth2ServerAppID
 The "Application ID" of the "OAuth2 Server" type app created in Identity Administration -> Apps -> Web Apps -> Add Web Apps -> Custom -> OAuth2 Server.
 This app must be configured as follows. If option is not specified, leave as default
@@ -56,6 +49,13 @@ setClaim('tenant_id', TenantData.Get('CybrTenantID'));
 setClaimArray('user_roles', LoginUser.RoleNames);
 setClaim('user_uuid', LoginUser.Uuid);
 ```
+
+## ServiceUserPasswordPlain
+The password of that user in plain text. This will be automatically encrypted the first time the script runs.  
+Encrypted passwords can only be decrypted by the user that encrypted it.
+
+## SyslogReceiverAddress
+The hostname and port of your Syslog Receiver (Currently only supports plain text TCP)
 
 ## StateDir
 The directory where the script will store its current state between executions
