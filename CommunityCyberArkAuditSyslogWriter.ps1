@@ -28,7 +28,7 @@ Function Write-LogMessage {
         [ValidateSet("Info", "Warning", "Error", "Debug", "Verbose", "Success", "LogOnly")]
         [String]$type = "Info"
     )
-    
+
     If (($type -eq "Verbose") -and ($true -ne $Script:VerboseLogging)) {
         # Ignore verbose messages if log level is set to Info
         return
@@ -38,7 +38,7 @@ Function Write-LogMessage {
         $null = New-Item -Path $LogDirectory -ItemType Directory
     }
     Try {
-        $msgToWrite = "[$(Get-Date -Format "yyyy-MM-dd hh:mm:ss")] "
+        $msgToWrite = "[$(Get-Date -Format "yyyy-MM-dd HH:mm:ss")] "
         # Replace empty message with 'N/A'
         if ([string]::IsNullOrEmpty($Msg)) { $Msg = "N/A" }
 
@@ -429,11 +429,11 @@ Write-LogMessage -type Verbose -MSG "Attempting to obtain lock."
 
 try {
     $LockFileStream = [System.IO.File]::Open($LockFile, "Open", "Write")
-}    
+}
 catch {
     Write-LogMessage -MSG "Failed to obtain a lock on the lock file, which means another instance of this tool is running. Exiting."
     exit 0
-}    
+}
 
 ### LOCK ACQUIRED ###
 
@@ -563,7 +563,7 @@ If ($Proceed) {
                 } | ConvertTo-Json -Depth 3
             )
             Write-LogMessage -type Error -MSG "This is a fatal error. Exiting."
-            $Proceed = $false        
+            $Proceed = $false
         }
     }
 }
@@ -581,7 +581,12 @@ If ($Proceed) {
         Write-LogMessage -type Verbose -MSG "Retrieving events from server"
         $Result = Invoke-RestMethod -Uri ('{0}/api/audits/stream/results' -f $Config.ApiBaseUrl) -Headers $Headers -Method POST -Body $ResultsBody
         $Count = $Result.data.length
-        Write-LogMessage -type Verbose -MSG "Received $Count events from server"
+        $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
+        $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
+        $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
+        $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
+        $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
+        Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
     }
     catch {
         Write-LogMessage -type Error -MSG "Failed to retrieve events from Audit service"
@@ -604,7 +609,7 @@ If ($Result.data) {
         # and try to send it to the syslog receiver
         $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString -SyslogReceiverProtocol $Config.SyslogReceiverProtocol -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation
         If ($SyslogSendResult.Result) {
-            Write-LogMessage -MSG "$Count events sent to syslog. Updating cursor."
+            Write-LogMessage -MSG "Events sent to syslog. Updating cursor."
             $CursorRef = $Result.paging.cursor.cursorRef
             $StoreCursor = $true
         }
@@ -631,7 +636,7 @@ If ($StoreCursor) {
     $Result = Update-CursorFile -CursorFile $CursorFile -CursorRef $CursorRef
     If ($false -eq $Result.Result) {
         Write-LogMessage -type Error -MSG "An error occurred while saving cursor file"
-        Write-LogMessage -type Error -MSG $Result.Details        
+        Write-LogMessage -type Error -MSG $Result.Details
     }
 }
 
