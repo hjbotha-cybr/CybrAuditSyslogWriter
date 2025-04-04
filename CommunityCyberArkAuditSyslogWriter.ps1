@@ -543,6 +543,7 @@ If ($Result.data) {
         $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString
         If ($SyslogSendResult.Result) {
             Write-LogMessage -MSG "$Count events sent to syslog. Updating cursor."
+            $CursorRef = $Result.paging.cursor.cursorRef
             $StoreCursor = $true
         }
         else {
