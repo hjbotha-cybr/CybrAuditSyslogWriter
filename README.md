@@ -30,7 +30,7 @@ The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberar
 The username of an "OAuth2 Confidential Client" user created in Identity Administration (Core Services -> Users -> Add User -> Select "Is OAuth confidential client")
 
 ## ServiceUserPasswordPlain
-The password of that user in plain text. This will be automatically encrypted the first time the script runs.
+The password of that user in plain text. This will be automatically encrypted the first time the script runs.  
 Encrypted passwords can only be decrypted by the user that encrypted it.
 
 ## SyslogReceiverAddress
@@ -39,21 +39,23 @@ The hostname and port of your Syslog Receiver (Currently only supports plain tex
 ## OAuth2ServerAppID
 The "Application ID" of the "OAuth2 Server" type app created in Identity Administration -> Apps -> Web Apps -> Add Web Apps -> Custom -> OAuth2 Server.
 This app must be configured as follows. If option is not specified, leave as default
-Settings:
-  Provide a unique Application ID and a descriptive display name.
-Tokens: 
-  Token auth methods: Client Creds only
-  Access token lifetime: Flexible. Recommend 1 hour to balance lifetime and refresh overhead
-  Issue refresh tokens: No
-Scope:
-  Name: isp.audit.events:read
-Permissions
-  Grant Run permission to the OAuth Confidential client user specified in "ServiceUserUsername"
-Advanced
-  Copy the following script (REMOVE THE LEADING # SYMBOLS):
-    setClaim('tenant_id', TenantData.Get('CybrTenantID'));
-    setClaimArray('user_roles', LoginUser.RoleNames);
-    setClaim('user_uuid', LoginUser.Uuid);
+- Settings:
+  - Provide a unique Application ID and a descriptive display name.
+- Tokens: 
+  -   Token auth methods: Client Creds only
+  -   Access token lifetime: Flexible. Recommend 1 hour to balance lifetime and refresh overhead
+  -   Issue refresh tokens: No
+- Scope:
+  -   Name: isp.audit.events:read
+- Permissions
+  -   Grant Run permission to the OAuth Confidential client user specified in "ServiceUserUsername"
+- Advanced
+  - Copy the following script (do not modify)
+```
+setClaim('tenant_id', TenantData.Get('CybrTenantID'));
+setClaimArray('user_roles', LoginUser.RoleNames);
+setClaim('user_uuid', LoginUser.Uuid);
+```
 
 ## StateDir
 The directory where the script will store its current state between executions
