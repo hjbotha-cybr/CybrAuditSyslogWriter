@@ -207,9 +207,11 @@ function Send-SyslogMessage {
                 $null = $tcpConnection.Close()
                 return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
             }
+            $null = $ConnectionWriter.Close()
+            $null = $tcpConnection.Close()
         }
-        # if we get here the switch block has completed successfully, so wrap up and return
     }
+    # if we get here the switch block has completed successfully, so wrap up and return result
     return New-SuccesssfulReturnObject
 }
 
