@@ -137,6 +137,8 @@ function New-SuccesssfulReturnObject {
 function Send-SyslogMessage {
     Param (
         [string]$SyslogReceiverAddress,
+        [string]$SyslogReceiverProtocol,
+        [string]$SyslogReceiverCertValidation,
         [boolean]$Tls,
         [string]$Message
     )
@@ -147,27 +149,67 @@ function Send-SyslogMessage {
     # Encode message to bytes
     $AsciiEncoder = [Text.Encoding]::ASCII
     $EncodedMessage = $AsciiEncoder.GetBytes($Message)
-    try {
-        $tcpConnection = New-Object -TypeName System.Net.Sockets.TcpClient
-        $tcpConnection.Connect($SyslogReceiverHost, $SyslogReceiverPort)
+    $ProtocolVersions = @([System.Security.Authentication.SslProtocols]::Tls12)
+    switch -regex ($SyslogReceiverProtocol) {
+        "^tcps?$" {
+            # TCP and TCPS start the same - open a connection
+            try {
+                Write-LogMessage -type Verbose -MSG "Creating TCP Client"
+                $tcpConnection = New-Object -TypeName System.Net.Sockets.TcpClient
+                $tcpConnection.Connect($SyslogReceiverHost, $SyslogReceiverPort)
+            }
+            catch {
+                $null = $tcpConnection.Close()
+                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while connecting to syslog server"
+            }
+        }
+        "^tcps$" {
+            try {
+                Write-LogMessage -type Verbose -MSG "Creating encrypted connection stream"
+                # If TLS, Negotiate encryption
+                If ($SyslogReceiverCertValidation -eq "yes") {
+                    Write-LogMessage -type Verbose -MSG "Certificate will be validated"
+                    $ConnectionStream = New-Object -TypeName System.Net.Security.SslStream -ArgumentList ($tcpConnection.GetStream(), $false)
+                }
+                else {
+                    Write-LogMessage -type Verbose -MSG "Certificate will not be validated"
+                    $ConnectionStream = New-Object -TypeName System.Net.Security.SslStream -ArgumentList ($tcpConnection.GetStream(), $false, $true)
+                }
+                $ConnectionStream.AuthenticateAsClient($SyslogReceiverHost, $null, $ProtocolVersions, $false)
+            }
+            catch {
+                $null = $ConnectionStream.Close()
+                $null = $tcpConnection.Close()
+                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred during TLS negotiation"
+
+            }
+        }
+        "^tcp$" {
+            Write-LogMessage -type Verbose -MSG "Creating plain connection stream"
+            try {
+                $ConnectionStream = $tcpConnection.GetStream()
+            }
+            catch {
+                $null = $tcpConnection.Close()
+                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while creating the data stream"
+            }
+        }
+        "^tcps?$" {
+            Write-LogMessage -type Verbose -MSG "Sending syslog message"
+            try {
+                # and send the message
+                $ConnectionWriter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $ConnectionStream
+                $ConnectionWriter.AutoFlush = $true
+                $ConnectionWriter.Write($EncodedMessage, 0, $EncodedMessage.length)
+            }
+            catch {
+                $null = $ConnectionWriter.Close()
+                $null = $tcpConnection.Close()
+                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
+            }
+        }
+        # if we get here the switch block has completed successfully, so wrap up and return
     }
-    catch {
-        $null = $tcpConnection.Close()
-        return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while connecting to syslog server"
-    }
-    try {
-        $ConnectionStream = $tcpConnection.GetStream()
-        $ConnectionWriter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $ConnectionStream
-        $ConnectionWriter.AutoFlush = $true
-        $ConnectionWriter.Write($EncodedMessage, 0, $EncodedMessage.length)
-    }
-    catch {
-        $null = $ConnectionWriter.Close()
-        $null = $tcpConnection.Close()
-        return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
-    }
-    $null = $ConnectionWriter.Close()
-    $null = $tcpConnection.Close()
     return New-SuccesssfulReturnObject
 }
 
@@ -311,6 +353,20 @@ If (-not (
     exit 1
 }
 
+$WriteConfigFile = $false
+
+If (-not $Config.SyslogReceiverProtocol) {
+    # Set a default SyslogReceiverProtocol if unset
+    $Config.SyslogReceiverProtocol = "tcp"
+    $WriteConfigFile = $true
+}
+
+If (-not $Config.SyslogReceiverCertValidation) {
+    # Set a default SyslogReceiverCertValidation if unset
+    $Config.SyslogReceiverCertValidation = "yes"
+    $WriteConfigFile = $true
+}
+
 If ($Config.LogLevel -eq "Verbose") {
     $Script:VerboseLogging = $true
 }
@@ -386,6 +442,10 @@ If ($Config.ServiceUserPasswordPlain) {
     Write-LogMessage -MSG "Found a plain text password in the config. Replacing it with encrypted password."
     $Config.ServiceUserPasswordEncrypted = $Config.ServiceUserPasswordPlain | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString
     $Config.ServiceUserPasswordPlain = $null
+    $WriteConfigFile = $true
+}
+
+If ($WriteConfigFile) {
     Set-IniContent -IniFile $ConfigFile -InputObject $Config
 }
 
@@ -538,18 +598,14 @@ If ($Result.data) {
     #Write-LogMessage -MSG "Sending:"
     #Write-LogMessage -MSG $SyslogString
     #Write-LogMessage -MSG "New Data: $SyslogString"
-    try {
-        # and try to send it to the syslog receiver
-        $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString
-        If ($SyslogSendResult.Result) {
-            Write-LogMessage -MSG "$Count events sent to syslog. Updating cursor."
-            $StoreCursor = $true
-        }
-        else {
-            throw
-        }
+    # and try to send it to the syslog receiver
+    $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString -SyslogReceiverProtocol $Config.SyslogReceiverProtocol -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation
+    If ($SyslogSendResult.Result) {
+        Write-LogMessage -MSG "$Count events sent to syslog. Updating cursor."
+        $CursorRef = $Result.paging.cursor.cursorRef
+        $StoreCursor = $true
     }
-    catch {
+    else {
         Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
         Write-LogMessage -type Error -MSG $SyslogSendResult.Details
         Write-LogMessage -type Error -MSG "Current cursorRef will be retained so the same logs can be retrieved again."
@@ -564,7 +620,12 @@ else {
 
 
 If ($StoreCursor) {
-    $null = Update-CursorFile -CursorFile $CursorFile -CursorRef $CursorRef
+    Write-LogMessage -type Verbose -MSG "Updating cursor file"
+    $Result = Update-CursorFile -CursorFile $CursorFile -CursorRef $CursorRef
+    If ($false -eq $Result.Result) {
+        Write-LogMessage -type Error -MSG "An error occurred while saving cursor file"
+        Write-LogMessage -type Error -MSG $Result.Details        
+    }
 }
 
 Write-LogMessage -type Info -MSG "Completed execution"

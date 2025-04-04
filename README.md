@@ -57,6 +57,12 @@ Encrypted passwords can only be decrypted by the user that encrypted it.
 ## SyslogReceiverAddress
 The hostname and port of your Syslog Receiver (Currently only supports plain text TCP)
 
+## SyslogReceiverProtocol
+The protocol of your Syslog Receiver (Valid values: tcp, tcps)
+
+## SyslogReceiverCertValidation
+Whether to validate the identity of a TLS receiver
+
 ## StateDir
 The directory where the script will store its current state between executions
 
