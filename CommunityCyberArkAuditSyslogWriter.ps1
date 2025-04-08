@@ -622,13 +622,6 @@ If ($Proceed) {
         # Request the next set of data
         Write-LogMessage -type Verbose -MSG "Retrieving events from server"
         $Result = Invoke-RestMethod -Uri ('{0}/api/audits/stream/results' -f $Config.ApiBaseUrl) -Headers $Headers -Method POST -Body $ResultsBody
-        $Count = $Result.data.length
-        $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
-        $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
-        $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
-        $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
-        $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
-        Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
     }
     catch {
         Write-LogMessage -type Error -MSG "Failed to retrieve events from Audit service"
@@ -643,6 +636,15 @@ If ($Proceed) {
 
 If ($Result.data) {
     # convert it to strings
+    $Count = $Result.data.length
+    
+    $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
+    $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
+    $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
+    $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
+    $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
+    
+    Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
     $SyslogMessageArray = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
     #Write-LogMessage -MSG "Sending:"
     try {
