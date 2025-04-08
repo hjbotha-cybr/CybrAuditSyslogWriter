@@ -241,7 +241,8 @@ function New-PlatformAccessHeaders {
     Param (
         [psobject]$IdentityTokenUrl,
         [PSCredential]$CredentialObject,
-        [string]$AuditApiKey
+        [string]$AuditApiKey,
+        $UserAgent
     )
 
     # Create an HTTP Basic Authentication string and header
@@ -255,6 +256,7 @@ function New-PlatformAccessHeaders {
 
     $Headers = @{
         Authorization = ("Basic {0}" -f $encodedcreds)
+        "User-Agent"  = $UserAgent
     }
 
     $Body = @{
@@ -333,6 +335,9 @@ function Set-IniContent {
         return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while saving config to ini file"
     }
 }
+
+$ScriptVersion = 1.2.0
+$ScriptUserAgent = "Mozilla/5.0 +https://github.com/hjbotha-cybr/CybrAuditSyslogWriter CybrAuditSyslogWriter/$ScriptVersion"
 
 ### LOAD CONFIG ###
 
@@ -504,6 +509,7 @@ If (Test-Path $TokenFile) {
 
     # ConvertFrom-Json creates a PSCustomObject, while Invoke-RestMethod needs headers as a hashtable, so convert it
     $Headers = ConvertTo-HashTableFromPSCustomObject -InputObject $TokenObj.Headers
+    $Headers.'User-Agent' = $ScriptUserAgent
 }
 else {
     # This is the first run, so initialise the object that will keep a log of successfully retrieved events
@@ -528,11 +534,16 @@ If ($NowTime -gt $TokenObj.TokenExpiry) {
     # if now is after token expiry time
     Write-LogMessage -type Info -MSG "No valid token available. Retrieving a new token from CyberArk."
     $IdentityTokenUrl = ("{0}/OAuth2/Token/{1}" -f $Config.IdentityUrl, $Config.OAuth2ServerAppID)
-    $GetPlatformHeaderResult = New-PlatformAccessHeaders -IdentityTokenUrl $IdentityTokenUrl -CredentialObject $ServiceUserCredentials -AuditApiKey $Config.AuditApiKey
+    $GetPlatformHeaderResult = New-PlatformAccessHeaders `
+        -IdentityTokenUrl $IdentityTokenUrl `
+        -CredentialObject $ServiceUserCredentials `
+        -AuditApiKey $Config.AuditApiKey `
+        -UserAgent $ScriptUserAgent
     If ($GetPlatformHeaderResult.Result) {
         $TokenObj.TokenExpiry = $GetPlatformHeaderResult.ExpiryTime
         $TokenObj.Headers = $GetPlatformHeaderResult.Headers
         $Headers = $TokenObj.Headers
+        $Headers."User-Agent" = $ScriptUserAgent
         # Store the updated token in the state dir
         $null = Update-TokenFile -TokenFile $TokenFile -TokenObj $TokenObj
     }
