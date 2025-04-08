@@ -4,24 +4,62 @@ CyberArk Audit Syslog Writer retrieves events from the CyberArk Audit service an
 NOTE: This is a community script and not supported by CyberArk.
 
 # Installation
-- Create the required backend configuration
-  - Information available in the example config file, or in CyberArk documentation
-- Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
-  - Installs to `Program Files\CyberArk` by default. Can be modified with `-InstallPath`
-- Copy the `Config.example.ini` file to `Config.ini`
-- Edit the config as needed
-  - Details below
-- Enable the scheduled task
-- Monitor logs for errors
-  - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
+1. Create the required backend configuration
+   - Information available in the example config file, or in CyberArk documentation
+2. Unblock the downloaded zip file
+   1. Right-click on the zip file
+   2. Select Properties
+   3. Select the "Unblock" option, if available
+   4. Click OK
+3. Extract the zip file
+4. Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
+   - Installs to `Program Files\CyberArk` by default. Can be modified with `-InstallPath`
+5. Copy the `Config.example.ini` file to `Config.ini`
+6. Edit the config as needed
+   - Details below
+7. Enable the scheduled task
+8. Monitor logs for errors
+   - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
+9. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
+
+# Upgrades
+To upgrade when a new version is released:
+1. Back up the current script files
+2. Download the new version
+3. Unblock the downloaded zip file
+   1. Right-click on the zip file
+   2. Select Properties
+   3. Select the "Unblock" option, if available
+   4. Click OK
+4. Extract the zip file
+5. Overwrite `CommunityCyberArkAuditSyslogWriter.ps1` with the new version of the file
+6. Review _Functions.psm1 for any newly implemented functions, and copy them to _Functions.psm1
 
 # Usage
-Just run the scheduled task and review logs.
+Run the scheduled task and review logs.
 
 If you need to run the script in a different context (e.g. interactively), you will need to set the `ServiceUserPasswordPlain` config parameter again, because the Encrypted passwords can only be decrypted by the user that generated it.
 
-# Configuration
-Create config.ini and provide the following details:
+## Return codes
+The scheduled task will return one of the following error codes in specific situations.
+### Error return codes
+| Return code | Definition                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1           | There is an error in the config.ini                                                                                                                                         |
+| 2           | Failed to create the state directory specified in config.ini                                                                                                                |
+| 3           | Failed to decrypt the password set in ServiceUserPasswordEncrypted. Will occur if the password was encrypted by a user which is different from the user running the script. |
+| 4           | Failed to create the lock file in the state directory                                                                                                                       |
+| 5           | Non-fatal errors occurred during execution. Review logs for details.                                                                                                        |
+
+### Normal return codes
+
+| Return code | Definition                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| 0           | Successful execution                                                                                    |
+| 9           | The script was unable to acquire a lock, indicating that another instance of the script may be running. |
+
+# Config.ini Options Reference
+This section contains mostly the same information as `Config.example.ini` and is provided here as an additional reference.
 
 ## IdentityUrl
 The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberark.cloud`. This is the URL shown at the login page for your CyberArk tenant.
@@ -79,3 +117,8 @@ The API base URL of your Audit service (e.g. `https://SUBDOMAIN.audit.cyberark.c
 
 ## LogLevel
 The log level of the tool. Valid values are "Info" and "Verbose"
+
+# SyslogMessageJoinString
+When using TCP or TCPS, multiple messages can be sent in one syslog connection. Set SyslogMessageJoinString to the character strings which should be inserted between messages.
+
+The default, `` `r`n ``, is "CRLF" - a Windows line break

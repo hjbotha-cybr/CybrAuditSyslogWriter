@@ -92,7 +92,7 @@ function Update-CursorFile {
         return New-SuccesssfulReturnObject
     }
     catch {
-        New-ErrorReturnObject -ErrorObject $_
+        Invoke-ErrorResponse -ErrorObject $_
     }
 }
 
@@ -107,26 +107,29 @@ function Update-TokenFile {
         return New-SuccesssfulReturnObject
     }
     catch {
-        New-ErrorReturnObject -ErrorObject $_
+        Invoke-ErrorResponse -ErrorObject $_
     }
 }
 
 
-function New-ErrorReturnObject {
+function Invoke-ErrorResponse {
     Param(
         $ErrorObject,
         $AdditionalInformation
     )
-    return @{
+    $ErrorSubject = $AdditionalInformation
+    $ErrorDetails = @{
+        ErrorDetails          = $ErrorObject.ErrorDetails
+        ExceptionMessage      = $ErrorObject.Exception.Message
+        AdditionalInformation = $AdditionalInformation
+    } | ConvertTo-Json -Depth 3
+    Send-ErrorNotifications -MessageSubject $ErrorSubject -MessageDetails $ErrorDetails
+    $ReturnObject = @{
         Result  = $false
-        Details = @{
-            ErrorDetails          = $ErrorObject.ErrorDetails
-            ExceptionMessage      = $ErrorObject.Exception.Message
-            AdditionalInformation = $AdditionalInformation
-        } | ConvertTo-Json -Depth 3
+        Details = $ErrorDetails
     }
+    return $ReturnObject
 }
-
 
 function New-SuccesssfulReturnObject {
     return @{
@@ -140,7 +143,8 @@ function Send-SyslogMessage {
         [string]$SyslogReceiverProtocol,
         [string]$SyslogReceiverCertValidation,
         [boolean]$Tls,
-        [string]$Message
+        [string[]]$Message,
+        [string]$SyslogMessageJoinString
     )
     $SyslogReceiverArray = $SyslogReceiverAddress -split ":"
     $SyslogReceiverHost = $SyslogReceiverArray[0]
@@ -148,10 +152,18 @@ function Send-SyslogMessage {
 
     # Encode message to bytes
     $AsciiEncoder = [Text.Encoding]::ASCII
-    $EncodedMessage = $AsciiEncoder.GetBytes($Message)
+
     $ProtocolVersions = @([System.Security.Authentication.SslProtocols]::Tls12)
     switch -regex ($SyslogReceiverProtocol) {
         "^tcps?$" {
+            # Join syslog event array into one string
+            # Doing this in the TCP block because it won't be required for UDP
+            $EvaluatedSyslogMessageJoinString = $ExecutionContext.InvokeCommand.ExpandString($SyslogMessageJoinString)
+            $JoinedSyslogMessage = ($Message -join $EvaluatedSyslogMessageJoinString)
+            #$JoinedSyslogMessage = ($Message -join "")
+
+            $EncodedMessage = $AsciiEncoder.GetBytes($JoinedSyslogMessage)
+            #write-host $EncodedMessage
             # TCP and TCPS start the same - open a connection
             try {
                 Write-LogMessage -type Verbose -MSG "Creating TCP Client"
@@ -160,7 +172,7 @@ function Send-SyslogMessage {
             }
             catch {
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while connecting to syslog server"
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while connecting to syslog server"
             }
         }
         "^tcps$" {
@@ -180,8 +192,7 @@ function Send-SyslogMessage {
             catch {
                 $null = $ConnectionStream.Close()
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred during TLS negotiation"
-
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred during TLS negotiation"
             }
         }
         "^tcp$" {
@@ -191,7 +202,7 @@ function Send-SyslogMessage {
             }
             catch {
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while creating the data stream"
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while creating the data stream"
             }
         }
         "^tcps?$" {
@@ -205,7 +216,7 @@ function Send-SyslogMessage {
             catch {
                 $null = $ConnectionWriter.Close()
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
             }
             $null = $ConnectionWriter.Close()
             $null = $tcpConnection.Close()
@@ -230,7 +241,8 @@ function New-PlatformAccessHeaders {
     Param (
         [psobject]$IdentityTokenUrl,
         [PSCredential]$CredentialObject,
-        [string]$AuditApiKey
+        [string]$AuditApiKey,
+        $UserAgent
     )
 
     # Create an HTTP Basic Authentication string and header
@@ -244,6 +256,7 @@ function New-PlatformAccessHeaders {
 
     $Headers = @{
         Authorization = ("Basic {0}" -f $encodedcreds)
+        "User-Agent"  = $UserAgent
     }
 
     $Body = @{
@@ -256,7 +269,7 @@ function New-PlatformAccessHeaders {
         $Response = Invoke-RestMethod -Body $Body -Method POST -Uri $IdentityTokenUrl -Headers $Headers -TimeoutSec 10
     }
     catch {
-        return New-ErrorReturnObject -ErrorObject $_
+        return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred during authentication"
     }
     $NowTime = Get-Date
     $ExpiryTime = $NowTime.AddSeconds($Response.expires_in - 60) # subtract 1 minute from expiry time to ensure we'll refresh BEFORE it expires
@@ -295,7 +308,7 @@ function Get-DataFromIniFile {
                     Message = "N/A"
                 }
             }
-            return New-ErrorReturnObject -ErrorObject $ErrorObject
+            return Invoke-ErrorResponse -ErrorObject $ErrorObject -AdditionalInformation "Error occurred while loading data from ini file"
         }
     }
     return $IniObj
@@ -319,9 +332,12 @@ function Set-IniContent {
         return New-SuccesssfulReturnObject
     }
     catch {
-        return New-ErrorReturnObject -ErrorObject $_
+        return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while saving config to ini file"
     }
 }
+
+$ScriptVersion = 1.2.0
+$ScriptUserAgent = "Mozilla/5.0 +https://github.com/hjbotha-cybr/CybrAuditSyslogWriter CybrAuditSyslogWriter/$ScriptVersion"
 
 ### LOAD CONFIG ###
 
@@ -369,6 +385,12 @@ If (-not $Config.SyslogReceiverCertValidation) {
     $WriteConfigFile = $true
 }
 
+If (-not $Config.SyslogMessageJoinString) {
+    # Set a default SyslogMessageJoinString if unset
+    $Config.SyslogMessageJoinString = '`r`n'
+    $WriteConfigFile = $true
+}
+
 If ($Config.LogLevel -eq "Verbose") {
     $Script:VerboseLogging = $true
 }
@@ -383,6 +405,7 @@ $LockFile = ("{0}\lock" -f $Config.StateDir)
 
 $Script:LogDirectory = ("{0}\CommunityCybrAuditSyslogWriterLogs" -f $env:temp)
 $Script:LogFile = $LogDirectory + "\Writer.log"
+$ReturnCode = 0
 
 # Delete old logs
 
@@ -396,7 +419,19 @@ If ($LogSize -gt $MaxLogSize) {
 $OlderLogs = Get-ChildItem $LogDirectory | Sort-Object -Property LastWriteTime -Descending | Select-Object -Skip 5
 If ($OlderLogs) {
     Write-Host ("removing logs " -f $OlderLogs.FullName)
-    Remove-Item -Path $OlderLogs.FullName
+    try {
+        Remove-Item -Path $OlderLogs.FullName
+    }
+    catch {
+        $AdditionalInformation = "Error occurred while deleting old log files."
+        $ErrorObject = @{
+            AdditionalInformation = $AdditionalInformation
+            ErrorDetails          = $_.ErrorDetails
+            ExceptionMessage      = $_.Exception.Message
+        } | ConvertTo-Json -Depth 5
+        $ReturnCode = 5
+        return Invoke-ErrorResponse -AdditionalInformation $AdditionalInformation -ErrorObject
+    }
 }
 
 # Check if the state directory defined in config file exists, and attempt to create if not
@@ -407,7 +442,7 @@ If ($false -eq (Test-Path -Path $Config.StateDir -Type Container)) {
     catch {
         Write-LogMessage -type Error -MSG "Failed to create state dir. This is a fatal error. Please review and correct."
         Write-LogMessage -type Error -MSG ("Error: {0}" -f $_.Exception.Message)
-        exit 1
+        exit 2
     }
 }
 
@@ -421,7 +456,7 @@ If ($false -eq (Test-Path -Path $LockFile -Type Leaf)) {
     catch {
         Write-LogMessage -type Error -MSG "Failed to create lock file. This is a fatal error. Please review and correct."
         Write-LogMessage -type Error -MSG ("Error: {0}" -f $_.Exception.Message)
-        exit 1
+        exit 4
     }
 }
 
@@ -432,7 +467,7 @@ try {
 }
 catch {
     Write-LogMessage -MSG "Failed to obtain a lock on the lock file, which means another instance of this tool is running. Exiting."
-    exit 0
+    exit 9
 }
 
 ### LOCK ACQUIRED ###
@@ -460,7 +495,7 @@ try {
 catch {
     Write-LogMessage -type Error -MSG "Failed to decrypt the password in config.ini. Note that the encrypted password cannot be transferred across systems."
     Write-LogMessage -type Error -MSG "Set `"ServiceUserPasswordPlain`" in Config.ini if you are copying the config from another system."
-    exit 1
+    exit 3
 }
 
 [PSCredential]$ServiceUserCredentials = New-Object System.Management.Automation.PSCredential($Config.ServiceUserUsername, $ServiceUserPassword)
@@ -487,6 +522,7 @@ If (Test-Path $TokenFile) {
 
     # ConvertFrom-Json creates a PSCustomObject, while Invoke-RestMethod needs headers as a hashtable, so convert it
     $Headers = ConvertTo-HashTableFromPSCustomObject -InputObject $TokenObj.Headers
+    $Headers.'User-Agent' = $ScriptUserAgent
 }
 else {
     # This is the first run, so initialise the object that will keep a log of successfully retrieved events
@@ -511,11 +547,16 @@ If ($NowTime -gt $TokenObj.TokenExpiry) {
     # if now is after token expiry time
     Write-LogMessage -type Info -MSG "No valid token available. Retrieving a new token from CyberArk."
     $IdentityTokenUrl = ("{0}/OAuth2/Token/{1}" -f $Config.IdentityUrl, $Config.OAuth2ServerAppID)
-    $GetPlatformHeaderResult = New-PlatformAccessHeaders -IdentityTokenUrl $IdentityTokenUrl -CredentialObject $ServiceUserCredentials -AuditApiKey $Config.AuditApiKey
+    $GetPlatformHeaderResult = New-PlatformAccessHeaders `
+        -IdentityTokenUrl $IdentityTokenUrl `
+        -CredentialObject $ServiceUserCredentials `
+        -AuditApiKey $Config.AuditApiKey `
+        -UserAgent $ScriptUserAgent
     If ($GetPlatformHeaderResult.Result) {
         $TokenObj.TokenExpiry = $GetPlatformHeaderResult.ExpiryTime
         $TokenObj.Headers = $GetPlatformHeaderResult.Headers
         $Headers = $TokenObj.Headers
+        $Headers."User-Agent" = $ScriptUserAgent
         # Store the updated token in the state dir
         $null = Update-TokenFile -TokenFile $TokenFile -TokenObj $TokenObj
     }
@@ -523,6 +564,7 @@ If ($NowTime -gt $TokenObj.TokenExpiry) {
         Write-LogMessage -MSG "Failed to update platform headers. Result was:"
         Write-LogMessage -MSG $GetPlatformHeaderResult.Details | ConvertTo-Json -Depth 5
         Write-LogMessage -MSG "This is a fatal error. Remaining steps will be skipped."
+        $ReturnCode = 5
         $Proceed = $false
     }
 }
@@ -562,8 +604,8 @@ If ($Proceed) {
                     ErrorDetails     = $_.ErrorDetails
                 } | ConvertTo-Json -Depth 3
             )
-            Write-LogMessage -type Error -MSG "This is a fatal error. Exiting."
             $Proceed = $false
+            $ReturnCode = 5
         }
     }
 }
@@ -580,13 +622,6 @@ If ($Proceed) {
         # Request the next set of data
         Write-LogMessage -type Verbose -MSG "Retrieving events from server"
         $Result = Invoke-RestMethod -Uri ('{0}/api/audits/stream/results' -f $Config.ApiBaseUrl) -Headers $Headers -Method POST -Body $ResultsBody
-        $Count = $Result.data.length
-        $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
-        $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
-        $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
-        $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
-        $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
-        Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
     }
     catch {
         Write-LogMessage -type Error -MSG "Failed to retrieve events from Audit service"
@@ -601,13 +636,25 @@ If ($Proceed) {
 
 If ($Result.data) {
     # convert it to strings
-    $SyslogString = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
+    $Count = $Result.data.length
+    
+    $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
+    $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
+    $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
+    $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
+    $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
+    
+    Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
+    $SyslogMessageArray = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
     #Write-LogMessage -MSG "Sending:"
-    #Write-LogMessage -MSG $SyslogString
-    #Write-LogMessage -MSG "New Data: $SyslogString"
     try {
         # and try to send it to the syslog receiver
-        $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString -SyslogReceiverProtocol $Config.SyslogReceiverProtocol -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation
+        $SyslogSendResult = Send-SyslogMessage `
+            -SyslogReceiverAddress $config.SyslogReceiverAddress `
+            -Message $SyslogMessageArray `
+            -SyslogReceiverProtocol $Config.SyslogReceiverProtocol `
+            -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation `
+            -SyslogMessageJoinString $Config.SyslogMessageJoinString
         If ($SyslogSendResult.Result) {
             Write-LogMessage -MSG "Events sent to syslog. Updating cursor."
             $CursorRef = $Result.paging.cursor.cursorRef
@@ -618,6 +665,7 @@ If ($Result.data) {
         }
     }
     catch {
+        $ReturnCode = 5
         Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
         Write-LogMessage -type Error -MSG $SyslogSendResult.Details
         Write-LogMessage -type Error -MSG "Current cursorRef will be retained so the same logs can be retrieved again."
@@ -644,3 +692,5 @@ Write-LogMessage -type Info -MSG "Completed execution"
 
 # Release the lock
 $null = Remove-FileLock -File $LockFileStream
+
+exit $ReturnCode
