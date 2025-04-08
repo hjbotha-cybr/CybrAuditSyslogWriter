@@ -42,13 +42,14 @@ If you need to run the script in a different context (e.g. interactively), you w
 
 ## Return codes
 The scheduled task will return one of the following error codes in specific situations.
-### Fatal error return codes
+### Error return codes
 | Return code | Definition                                                                                                                                                                  |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1           | There is an error in the config.ini                                                                                                                                         |
 | 2           | Failed to create the state directory specified in config.ini                                                                                                                |
 | 3           | Failed to decrypt the password set in ServiceUserPasswordEncrypted. Will occur if the password was encrypted by a user which is different from the user running the script. |
 | 4           | Failed to create the lock file in the state directory                                                                                                                       |
+| 5           | Non-fatal errors occurred during execution. Review logs for details.                                                                                                        |
 
 ### Normal return codes
 

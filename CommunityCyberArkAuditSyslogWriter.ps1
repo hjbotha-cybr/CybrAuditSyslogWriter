@@ -405,6 +405,7 @@ $LockFile = ("{0}\lock" -f $Config.StateDir)
 
 $Script:LogDirectory = ("{0}\CommunityCybrAuditSyslogWriterLogs" -f $env:temp)
 $Script:LogFile = $LogDirectory + "\Writer.log"
+$ReturnCode = 0
 
 # Delete old logs
 
@@ -418,7 +419,19 @@ If ($LogSize -gt $MaxLogSize) {
 $OlderLogs = Get-ChildItem $LogDirectory | Sort-Object -Property LastWriteTime -Descending | Select-Object -Skip 5
 If ($OlderLogs) {
     Write-Host ("removing logs " -f $OlderLogs.FullName)
-    Remove-Item -Path $OlderLogs.FullName
+    try {
+        Remove-Item -Path $OlderLogs.FullName
+    }
+    catch {
+        $AdditionalInformation = "Error occurred while deleting old log files."
+        $ErrorObject = @{
+            AdditionalInformation = $AdditionalInformation
+            ErrorDetails          = $_.ErrorDetails
+            ExceptionMessage      = $_.Exception.Message
+        } | ConvertTo-Json -Depth 5
+        $ReturnCode = 5
+        return Invoke-ErrorResponse -AdditionalInformation $AdditionalInformation -ErrorObject
+    }
 }
 
 # Check if the state directory defined in config file exists, and attempt to create if not
@@ -551,6 +564,7 @@ If ($NowTime -gt $TokenObj.TokenExpiry) {
         Write-LogMessage -MSG "Failed to update platform headers. Result was:"
         Write-LogMessage -MSG $GetPlatformHeaderResult.Details | ConvertTo-Json -Depth 5
         Write-LogMessage -MSG "This is a fatal error. Remaining steps will be skipped."
+        $ReturnCode = 5
         $Proceed = $false
     }
 }
@@ -590,8 +604,8 @@ If ($Proceed) {
                     ErrorDetails     = $_.ErrorDetails
                 } | ConvertTo-Json -Depth 3
             )
-            Write-LogMessage -type Error -MSG "This is a fatal error. Exiting."
             $Proceed = $false
+            $ReturnCode = 5
         }
     }
 }
@@ -649,6 +663,7 @@ If ($Result.data) {
         }
     }
     catch {
+        $ReturnCode = 5
         Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
         Write-LogMessage -type Error -MSG $SyslogSendResult.Details
         Write-LogMessage -type Error -MSG "Current cursorRef will be retained so the same logs can be retrieved again."
@@ -675,3 +690,5 @@ Write-LogMessage -type Info -MSG "Completed execution"
 
 # Release the lock
 $null = Remove-FileLock -File $LockFileStream
+
+exit $ReturnCode
