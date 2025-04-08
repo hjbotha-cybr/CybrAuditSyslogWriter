@@ -92,7 +92,7 @@ function Update-CursorFile {
         return New-SuccesssfulReturnObject
     }
     catch {
-        New-ErrorReturnObject -ErrorObject $_
+        Invoke-ErrorResponse -ErrorObject $_
     }
 }
 
@@ -107,26 +107,29 @@ function Update-TokenFile {
         return New-SuccesssfulReturnObject
     }
     catch {
-        New-ErrorReturnObject -ErrorObject $_
+        Invoke-ErrorResponse -ErrorObject $_
     }
 }
 
 
-function New-ErrorReturnObject {
+function Invoke-ErrorResponse {
     Param(
         $ErrorObject,
         $AdditionalInformation
     )
-    return @{
+    $ErrorSubject = $AdditionalInformation
+    $ErrorDetails = @{
+        ErrorDetails          = $ErrorObject.ErrorDetails
+        ExceptionMessage      = $ErrorObject.Exception.Message
+        AdditionalInformation = $AdditionalInformation
+    } | ConvertTo-Json -Depth 3
+    Send-ErrorNotifications -MessageSubject $ErrorSubject -MessageDetails $ErrorDetails
+    $ReturnObject = @{
         Result  = $false
-        Details = @{
-            ErrorDetails          = $ErrorObject.ErrorDetails
-            ExceptionMessage      = $ErrorObject.Exception.Message
-            AdditionalInformation = $AdditionalInformation
-        } | ConvertTo-Json -Depth 3
+        Details = $ErrorDetails
     }
+    return $ReturnObject
 }
-
 
 function New-SuccesssfulReturnObject {
     return @{
@@ -169,7 +172,7 @@ function Send-SyslogMessage {
             }
             catch {
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while connecting to syslog server"
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while connecting to syslog server"
             }
         }
         "^tcps$" {
@@ -189,8 +192,7 @@ function Send-SyslogMessage {
             catch {
                 $null = $ConnectionStream.Close()
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred during TLS negotiation"
-
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred during TLS negotiation"
             }
         }
         "^tcp$" {
@@ -200,7 +202,7 @@ function Send-SyslogMessage {
             }
             catch {
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while creating the data stream"
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while creating the data stream"
             }
         }
         "^tcps?$" {
@@ -214,7 +216,7 @@ function Send-SyslogMessage {
             catch {
                 $null = $ConnectionWriter.Close()
                 $null = $tcpConnection.Close()
-                return New-ErrorReturnObject -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
+                return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while attempting to send the syslog message"
             }
             $null = $ConnectionWriter.Close()
             $null = $tcpConnection.Close()
@@ -265,7 +267,7 @@ function New-PlatformAccessHeaders {
         $Response = Invoke-RestMethod -Body $Body -Method POST -Uri $IdentityTokenUrl -Headers $Headers -TimeoutSec 10
     }
     catch {
-        return New-ErrorReturnObject -ErrorObject $_
+        return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred during authentication"
     }
     $NowTime = Get-Date
     $ExpiryTime = $NowTime.AddSeconds($Response.expires_in - 60) # subtract 1 minute from expiry time to ensure we'll refresh BEFORE it expires
@@ -304,7 +306,7 @@ function Get-DataFromIniFile {
                     Message = "N/A"
                 }
             }
-            return New-ErrorReturnObject -ErrorObject $ErrorObject
+            return Invoke-ErrorResponse -ErrorObject $ErrorObject -AdditionalInformation "Error occurred while loading data from ini file"
         }
     }
     return $IniObj
@@ -328,7 +330,7 @@ function Set-IniContent {
         return New-SuccesssfulReturnObject
     }
     catch {
-        return New-ErrorReturnObject -ErrorObject $_
+        return Invoke-ErrorResponse -ErrorObject $_ -AdditionalInformation "Error occurred while saving config to ini file"
     }
 }
 

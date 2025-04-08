@@ -11,4 +11,14 @@ function ConvertTo-SyslogMessage {
     Return $FormattedMessageArray
 }
 
+Function Send-ErrorNotifications {
+    <#
+    This function will be called when errors occur, and can be modified to perform an action (such as sending an email or submitting a command to a monitoring system) in response.
+    By default it does nothing.
+    #>
+    Param (
+        $MessageSummary,
+        $MessageDetails
+    )
+    return $true
 }
