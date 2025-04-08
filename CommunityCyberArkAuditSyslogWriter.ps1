@@ -684,7 +684,7 @@ If ($Proceed) {
         Write-LogMessage -MSG "No new data."
         $CursorRef = $Result.paging.cursor.cursorRef
         $StoreCursor = $true
-    } 
+    }
 }
 
 
