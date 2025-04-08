@@ -6,27 +6,56 @@ NOTE: This is a community script and not supported by CyberArk.
 # Installation
 1. Create the required backend configuration
    - Information available in the example config file, or in CyberArk documentation
-2. Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
+2. Unblock the downloaded zip file
+   1. Right-click on the zip file
+   2. Select Properties
+   3. Select the "Unblock" option, if available
+   4. Click OK
+3. Extract the zip file
+4. Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
    - Installs to `Program Files\CyberArk` by default. Can be modified with `-InstallPath`
-3. Copy the `Config.example.ini` file to `Config.ini`
-4. Edit the config as needed
+5. Copy the `Config.example.ini` file to `Config.ini`
+6. Edit the config as needed
    - Details below
-5. Enable the scheduled task
-6. Monitor logs for errors
+7. Enable the scheduled task
+8. Monitor logs for errors
    - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
-7. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
+9. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
 
 # Upgrades
 To upgrade when a new version is released:
 1. Back up the current script files
 2. Download the new version
-3. Overwrite `CommunityCyberArkAuditSyslogWriter.ps1` with the new version of the file
-4. Review _Functions.psm1 for any newly implemented functions, and copy them to _Functions.psm1
+3. Unblock the downloaded zip file
+   1. Right-click on the zip file
+   2. Select Properties
+   3. Select the "Unblock" option, if available
+   4. Click OK
+4. Extract the zip file
+5. Overwrite `CommunityCyberArkAuditSyslogWriter.ps1` with the new version of the file
+6. Review _Functions.psm1 for any newly implemented functions, and copy them to _Functions.psm1
 
 # Usage
 Run the scheduled task and review logs.
 
 If you need to run the script in a different context (e.g. interactively), you will need to set the `ServiceUserPasswordPlain` config parameter again, because the Encrypted passwords can only be decrypted by the user that generated it.
+
+## Return codes
+The scheduled task will return one of the following error codes in specific situations.
+### Fatal error return codes
+| Return code | Definition                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1           | There is an error in the config.ini                                                                                                                                         |
+| 2           | Failed to create the state directory specified in config.ini                                                                                                                |
+| 3           | Failed to decrypt the password set in ServiceUserPasswordEncrypted. Will occur if the password was encrypted by a user which is different from the user running the script. |
+| 4           | Failed to create the lock file in the state directory                                                                                                                       |
+
+### Normal return codes
+
+| Return code | Definition                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| 0           | Successful execution                                                                                    |
+| 9           | The script was unable to acquire a lock, indicating that another instance of the script may be running. |
 
 # Config.ini Options Reference
 This section contains mostly the same information as `Config.example.ini` and is provided here as an additional reference.

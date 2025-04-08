@@ -429,7 +429,7 @@ If ($false -eq (Test-Path -Path $Config.StateDir -Type Container)) {
     catch {
         Write-LogMessage -type Error -MSG "Failed to create state dir. This is a fatal error. Please review and correct."
         Write-LogMessage -type Error -MSG ("Error: {0}" -f $_.Exception.Message)
-        exit 1
+        exit 2
     }
 }
 
@@ -443,7 +443,7 @@ If ($false -eq (Test-Path -Path $LockFile -Type Leaf)) {
     catch {
         Write-LogMessage -type Error -MSG "Failed to create lock file. This is a fatal error. Please review and correct."
         Write-LogMessage -type Error -MSG ("Error: {0}" -f $_.Exception.Message)
-        exit 1
+        exit 4
     }
 }
 
@@ -482,7 +482,7 @@ try {
 catch {
     Write-LogMessage -type Error -MSG "Failed to decrypt the password in config.ini. Note that the encrypted password cannot be transferred across systems."
     Write-LogMessage -type Error -MSG "Set `"ServiceUserPasswordPlain`" in Config.ini if you are copying the config from another system."
-    exit 1
+    exit 3
 }
 
 [PSCredential]$ServiceUserCredentials = New-Object System.Management.Automation.PSCredential($Config.ServiceUserUsername, $ServiceUserPassword)
