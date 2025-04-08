@@ -79,3 +79,8 @@ The API base URL of your Audit service (e.g. `https://SUBDOMAIN.audit.cyberark.c
 
 ## LogLevel
 The log level of the tool. Valid values are "Info" and "Verbose"
+
+# SyslogMessageJoinString
+When using TCP or TCPS, multiple messages can be sent in one syslog connection. Set SyslogMessageJoinString to the character strings which should be inserted between messages.
+
+The default, `` `r`n ``, is "CRLF" - a Windows line break
