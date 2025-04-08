@@ -454,7 +454,7 @@ try {
 }
 catch {
     Write-LogMessage -MSG "Failed to obtain a lock on the lock file, which means another instance of this tool is running. Exiting."
-    exit 0
+    exit 9
 }
 
 ### LOCK ACQUIRED ###
