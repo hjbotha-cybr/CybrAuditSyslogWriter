@@ -604,6 +604,7 @@ If ($Proceed) {
                     ErrorDetails     = $_.ErrorDetails
                 } | ConvertTo-Json -Depth 3
             )
+            Write-LogMessage -type Error -MSG "This is a fatal error. Remaining steps will be skipped."
             $Proceed = $false
             $ReturnCode = 5
         }
@@ -631,6 +632,7 @@ If ($Proceed) {
             } | ConvertTo-Json -Depth 5)
         Write-LogMessage -type Error -MSG "This is a fatal error. Remaining steps will be skipped."
         $Proceed = $false
+        $ReturnCode = 5
     }
 }
 
@@ -668,7 +670,7 @@ If ($Result.data) {
         $ReturnCode = 5
         Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
         Write-LogMessage -type Error -MSG $SyslogSendResult.Details
-        Write-LogMessage -type Error -MSG "Current cursorRef will be retained so the same logs can be retrieved again."
+        Write-LogMessage -type Error -MSG "This is a fatal error. Last cursorRef will be retained so the same logs can be retrieved again."
     }
 }
 else {
