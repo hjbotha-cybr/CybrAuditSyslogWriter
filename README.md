@@ -5,7 +5,7 @@ NOTE: This is a community script and not supported by CyberArk.
 
 # Installation
 1. Create the required backend configuration
-   - Information available in the example config file, or in CyberArk documentation
+   - Information available in the example config file, or in CyberArk documentation (https://docs.cyberark.com/admin-space/latest/en/content/siem-integration/siem-export-3rd-party.htm)
 2. Unblock the downloaded zip file
    1. Right-click on the zip file
    2. Select Properties
@@ -77,7 +77,7 @@ This app must be configured as follows. If option is not specified, leave as def
   -   Access token lifetime: Flexible. Recommend 1 hour to balance lifetime and refresh overhead
   -   Issue refresh tokens: No
 - Scope:
-  -   Name: isp.audit.events:read
+  -   Name: `isp.audit.events:read`
 - Permissions
   -   Grant Run permission to the OAuth Confidential client user specified in "ServiceUserUsername"
 - Advanced
@@ -96,7 +96,8 @@ Encrypted passwords can only be decrypted by the user that encrypted it.
 The hostname and port of your Syslog Receiver (Currently only supports plain text TCP)
 
 ## SyslogReceiverProtocol
-The protocol of your Syslog Receiver
+The protocol of your Syslog Receiver.
+
 Valid values are:
 | Value | Definition                        |
 | ----- | --------------------------------- |
@@ -104,21 +105,21 @@ Valid values are:
 | tcps  | TCP stream encrypted with TLS 1.2 |
 
 ## SyslogReceiverCertValidation
-Whether to validate the identity of a TLS receiver
+Whether to validate the identity of a TLS receiver.
 
 ## StateDir
-The directory where the script will store its current state between executions
+The directory where the script will store its current state between executions.
 
 ## AuditApiKey
-The API key of the SIEM integration created in the Audit service (CyberArk tenant -> Service Picker -> Audit -> SIEM Integrations)
+The API key of the SIEM integration created in the Audit service (CyberArk tenant -> Service Picker -> Audit -> SIEM Integrations).
 
 ## ApiBaseUrl
-The API base URL of your Audit service (e.g. `https://SUBDOMAIN.audit.cyberark.cloud`)
+The API base URL of your Audit service (e.g. `https://SUBDOMAIN.audit.cyberark.cloud`).
 
 ## LogLevel
-The log level of the tool. Valid values are "Info" and "Verbose"
+The log level of the tool. Valid values are "Info" and "Verbose".
 
 # SyslogMessageJoinString
 When using TCP or TCPS, multiple messages can be sent in one syslog connection. Set SyslogMessageJoinString to the character strings which should be inserted between messages.
 
-The default, `` `r`n ``, is "CRLF" - a Windows line break
+The default, `` `r`n ``, is "CRLF" - a Windows line break.
