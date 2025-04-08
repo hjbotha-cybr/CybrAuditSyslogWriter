@@ -140,7 +140,8 @@ function Send-SyslogMessage {
         [string]$SyslogReceiverProtocol,
         [string]$SyslogReceiverCertValidation,
         [boolean]$Tls,
-        [string]$Message
+        [string[]]$Message,
+        [string]$SyslogMessageJoinString
     )
     $SyslogReceiverArray = $SyslogReceiverAddress -split ":"
     $SyslogReceiverHost = $SyslogReceiverArray[0]
@@ -148,10 +149,18 @@ function Send-SyslogMessage {
 
     # Encode message to bytes
     $AsciiEncoder = [Text.Encoding]::ASCII
-    $EncodedMessage = $AsciiEncoder.GetBytes($Message)
+
     $ProtocolVersions = @([System.Security.Authentication.SslProtocols]::Tls12)
     switch -regex ($SyslogReceiverProtocol) {
         "^tcps?$" {
+            # Join syslog event array into one string
+            # Doing this in the TCP block because it won't be required for UDP
+            $EvaluatedSyslogMessageJoinString = $ExecutionContext.InvokeCommand.ExpandString($SyslogMessageJoinString)
+            $JoinedSyslogMessage = ($Message -join $EvaluatedSyslogMessageJoinString)
+            #$JoinedSyslogMessage = ($Message -join "")
+
+            $EncodedMessage = $AsciiEncoder.GetBytes($JoinedSyslogMessage)
+            #write-host $EncodedMessage
             # TCP and TCPS start the same - open a connection
             try {
                 Write-LogMessage -type Verbose -MSG "Creating TCP Client"
@@ -366,6 +375,12 @@ If (-not $Config.SyslogReceiverProtocol) {
 If (-not $Config.SyslogReceiverCertValidation) {
     # Set a default SyslogReceiverCertValidation if unset
     $Config.SyslogReceiverCertValidation = "yes"
+    $WriteConfigFile = $true
+}
+
+If (-not $Config.SyslogMessageJoinString) {
+    # Set a default SyslogMessageJoinString if unset
+    $Config.SyslogMessageJoinString = '`r`n'
     $WriteConfigFile = $true
 }
 
@@ -601,13 +616,16 @@ If ($Proceed) {
 
 If ($Result.data) {
     # convert it to strings
-    $SyslogString = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
+    $SyslogMessageArray = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
     #Write-LogMessage -MSG "Sending:"
-    #Write-LogMessage -MSG $SyslogString
-    #Write-LogMessage -MSG "New Data: $SyslogString"
     try {
         # and try to send it to the syslog receiver
-        $SyslogSendResult = Send-SyslogMessage -SyslogReceiverAddress $config.SyslogReceiverAddress -Message $SyslogString -SyslogReceiverProtocol $Config.SyslogReceiverProtocol -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation
+        $SyslogSendResult = Send-SyslogMessage `
+            -SyslogReceiverAddress $config.SyslogReceiverAddress `
+            -Message $SyslogMessageArray `
+            -SyslogReceiverProtocol $Config.SyslogReceiverProtocol `
+            -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation `
+            -SyslogMessageJoinString $Config.SyslogMessageJoinString
         If ($SyslogSendResult.Result) {
             Write-LogMessage -MSG "Events sent to syslog. Updating cursor."
             $CursorRef = $Result.paging.cursor.cursorRef

@@ -3,11 +3,12 @@ function ConvertTo-SyslogMessage {
         [PSCustomObject[]]$SyslogMessageObj
     )
 
-    $FormattedMessage = @()
+    $FormattedMessageArray = @()
     foreach ($Message in $SyslogMessageObj) {
-        $FormattedMessage += (ConvertTo-Json -Depth 10 -Compress -InputObject $Message).Trim()
-        $FormattedMessage += "`r`n"
+        $FormattedMessageArray += (ConvertTo-Json -Depth 10 -Compress -InputObject $Message).Trim()
     }
     
-    Return $FormattedMessage
+    Return $FormattedMessageArray
+}
+
 }
