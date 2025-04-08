@@ -4,24 +4,32 @@ CyberArk Audit Syslog Writer retrieves events from the CyberArk Audit service an
 NOTE: This is a community script and not supported by CyberArk.
 
 # Installation
-- Create the required backend configuration
-  - Information available in the example config file, or in CyberArk documentation
-- Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
-  - Installs to `Program Files\CyberArk` by default. Can be modified with `-InstallPath`
-- Copy the `Config.example.ini` file to `Config.ini`
-- Edit the config as needed
-  - Details below
-- Enable the scheduled task
-- Monitor logs for errors
-  - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
+1. Create the required backend configuration
+   - Information available in the example config file, or in CyberArk documentation
+2. Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
+   - Installs to `Program Files\CyberArk` by default. Can be modified with `-InstallPath`
+3. Copy the `Config.example.ini` file to `Config.ini`
+4. Edit the config as needed
+   - Details below
+5. Enable the scheduled task
+6. Monitor logs for errors
+   - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
+7. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
+
+# Upgrades
+To upgrade when a new version is released:
+1. Back up the current script files
+2. Download the new version
+3. Overwrite `CommunityCyberArkAuditSyslogWriter.ps1` with the new version of the file
+4. Review _Functions.psm1 for any newly implemented functions, and copy them to _Functions.psm1
 
 # Usage
-Just run the scheduled task and review logs.
+Run the scheduled task and review logs.
 
 If you need to run the script in a different context (e.g. interactively), you will need to set the `ServiceUserPasswordPlain` config parameter again, because the Encrypted passwords can only be decrypted by the user that generated it.
 
-# Configuration
-Create config.ini and provide the following details:
+# Config.ini Options Reference
+This section contains mostly the same information as `Config.example.ini` and is provided here as an additional reference.
 
 ## IdentityUrl
 The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberark.cloud`. This is the URL shown at the login page for your CyberArk tenant.
