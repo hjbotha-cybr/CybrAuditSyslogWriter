@@ -21,7 +21,7 @@ Function Write-LogMessage {
 	The type of the message to log (Info, Warning, Error, Debug)
 #>
     param(
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [String]$MSG,
         [Parameter(Mandatory = $false)]
@@ -142,7 +142,6 @@ function Send-SyslogMessage {
         [string]$SyslogReceiverAddress,
         [string]$SyslogReceiverProtocol,
         [string]$SyslogReceiverCertValidation,
-        [boolean]$Tls,
         [string[]]$Message,
         [string]$SyslogMessageJoinString
     )
@@ -237,7 +236,7 @@ function ConvertTo-HashTableFromPSCustomObject {
     return $hashtable
 }
 
-function New-PlatformAccessHeaders {
+function New-PlatformAccessHeader {
     Param (
         [psobject]$IdentityTokenUrl,
         [PSCredential]$CredentialObject,
@@ -321,10 +320,9 @@ function Set-IniContent {
     )
     $Data = ""
 
-    foreach ($property in $Config.PSObject.Properties["Keys"].value) {
-        $config.$property
-        If ($Config.$property) {
-            $Data += ("{0}={1}`n" -f $Property, $Config.$Property)
+    foreach ($property in $InputObject.PSObject.Properties["Keys"].value) {
+        If ($InputObject.$property) {
+            $Data += ("{0}={1}`n" -f $Property, $InputObject.$Property)
         }
     }
     try {
@@ -336,7 +334,7 @@ function Set-IniContent {
     }
 }
 
-$ScriptVersion = 1.2.0
+$ScriptVersion = 1.2.1
 $ScriptUserAgent = "Mozilla/5.0 +https://github.com/hjbotha-cybr/CybrAuditSyslogWriter CybrAuditSyslogWriter/$ScriptVersion"
 
 ### LOAD CONFIG ###
@@ -483,7 +481,14 @@ If ($Config.ServiceUserPasswordPlain) {
 }
 
 If ($WriteConfigFile) {
-    Set-IniContent -IniFile $ConfigFile -InputObject $Config
+    $Result = Set-IniContent -IniFile $ConfigFile -InputObject $Config
+    If ($Result.Result) {
+        Write-LogMessage "Updated config.ini"
+    }
+    else {
+        Write-LogMessage -type Error -MSG "An error occurred while updating config.ini"
+        Write-LogMessage -type Error -MSG $Result.Details
+    }
 }
 
 Import-Module -Name "$PSScriptRoot\_Functions.psm1" -Force
@@ -547,7 +552,7 @@ If ($NowTime -gt $TokenObj.TokenExpiry) {
     # if now is after token expiry time
     Write-LogMessage -type Info -MSG "No valid token available. Retrieving a new token from CyberArk."
     $IdentityTokenUrl = ("{0}/OAuth2/Token/{1}" -f $Config.IdentityUrl, $Config.OAuth2ServerAppID)
-    $GetPlatformHeaderResult = New-PlatformAccessHeaders `
+    $GetPlatformHeaderResult = New-PlatformAccessHeader `
         -IdentityTokenUrl $IdentityTokenUrl `
         -CredentialObject $ServiceUserCredentials `
         -AuditApiKey $Config.AuditApiKey `
@@ -636,48 +641,50 @@ If ($Proceed) {
     }
 }
 
-If ($Result.data) {
-    # convert it to strings
-    $Count = $Result.data.length
+If ($Proceed) {
+    If ($Result.data) {
+        # convert it to strings
+        $Count = $Result.data.length
 
-    $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
-    $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
-    $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
-    $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
-    $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
+        $EventsSortedByTimestamp = $Result.data | Sort-Object -Property timestamp
+        $FirstEventTimestamp = ($EventsSortedByTimestamp | Select-Object -First 1).timestamp
+        $LastEventTimestamp = ($EventsSortedByTimestamp | Select-Object -Last 1).timestamp
+        $FirstEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($FirstEventTimestamp)
+        $LastEventDateTime = (Get-Date -Date "1970-01-01Z").ToUniversalTime().AddMilliseconds($LastEventTimestamp)
 
-    Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
-    $SyslogMessageArray = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
-    #Write-LogMessage -MSG "Sending:"
-    try {
-        # and try to send it to the syslog receiver
-        $SyslogSendResult = Send-SyslogMessage `
-            -SyslogReceiverAddress $config.SyslogReceiverAddress `
-            -Message $SyslogMessageArray `
-            -SyslogReceiverProtocol $Config.SyslogReceiverProtocol `
-            -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation `
-            -SyslogMessageJoinString $Config.SyslogMessageJoinString
-        If ($SyslogSendResult.Result) {
-            Write-LogMessage -MSG "Events sent to syslog. Updating cursor."
-            $CursorRef = $Result.paging.cursor.cursorRef
-            $StoreCursor = $true
+        Write-LogMessage -MSG "Received $Count events from server ranging from $FirstEventDateTime to $LastEventDateTime"
+        $SyslogMessageArray = ConvertTo-SyslogMessage -SyslogMessageObj $Result.data
+        #Write-LogMessage -MSG "Sending:"
+        try {
+            # and try to send it to the syslog receiver
+            $SyslogSendResult = Send-SyslogMessage `
+                -SyslogReceiverAddress $config.SyslogReceiverAddress `
+                -Message $SyslogMessageArray `
+                -SyslogReceiverProtocol $Config.SyslogReceiverProtocol `
+                -SyslogReceiverCertValidation $Config.SyslogReceiverCertValidation `
+                -SyslogMessageJoinString $Config.SyslogMessageJoinString
+            If ($SyslogSendResult.Result) {
+                Write-LogMessage -MSG "Events sent to syslog. Updating cursor."
+                $CursorRef = $Result.paging.cursor.cursorRef
+                $StoreCursor = $true
+            }
+            else {
+                throw
+            }
         }
-        else {
-            throw
+        catch {
+            $ReturnCode = 5
+            Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
+            Write-LogMessage -type Error -MSG $SyslogSendResult.Details
+            Write-LogMessage -type Error -MSG "This is a fatal error. Last cursorRef will be retained so the same logs can be retrieved again."
         }
     }
-    catch {
-        $ReturnCode = 5
-        Write-LogMessage -type Error -MSG "Failed to send syslog message with error:"
-        Write-LogMessage -type Error -MSG $SyslogSendResult.Details
-        Write-LogMessage -type Error -MSG "This is a fatal error. Last cursorRef will be retained so the same logs can be retrieved again."
-    }
-}
-else {
-    # If we get here, there was no new data so just update the cursor
-    Write-LogMessage -MSG "No new data."
-    $CursorRef = $Result.paging.cursor.cursorRef
-    $StoreCursor = $true
+    else {
+        # If we get here, there was no new data so just update the cursor
+        Write-LogMessage -MSG "No new data."
+        $CursorRef = $Result.paging.cursor.cursorRef
+        $StoreCursor = $true
+    } 
 }
 
 
