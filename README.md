@@ -18,10 +18,10 @@ NOTE: This is a community script and not supported by CyberArk.
 6. Copy the `Config.example.ini` file to `Config.ini`
 7. Edit the config as needed
    - Details below
-8. Enable the scheduled task
-9. Monitor logs for errors
+8. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
+9. Enable the scheduled task
+10. Monitor logs for errors
    - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
-10. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
 
 # Upgrades
 To upgrade when a new version is released:
