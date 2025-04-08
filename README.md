@@ -6,21 +6,22 @@ NOTE: This is a community script and not supported by CyberArk.
 # Installation
 1. Create the required backend configuration
    - Information available in the example config file, or in CyberArk documentation (https://docs.cyberark.com/admin-space/latest/en/content/siem-integration/siem-export-3rd-party.htm)
-2. Unblock the downloaded zip file
+2. Download the tool
+3. Unblock the downloaded zip file
    1. Right-click on the zip file
    2. Select Properties
    3. Select the "Unblock" option, if available
    4. Click OK
-3. Extract the zip file
-4. Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
+4. Extract the zip file
+5. Run the `Install-CyberArkAuditWriter.ps1` to install the files and create the scheduled task
    - Installs to `Program Files\CyberArk` by default. Can be modified with `-InstallPath`
-5. Copy the `Config.example.ini` file to `Config.ini`
-6. Edit the config as needed
+6. Copy the `Config.example.ini` file to `Config.ini`
+7. Edit the config as needed
    - Details below
-7. Enable the scheduled task
-8. Monitor logs for errors
+8. Enable the scheduled task
+9. Monitor logs for errors
    - Logs are written to C:\Windows\Temp\CommunityCybrAuditSyslogWriterLogs\
-9. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
+10. (optional) Edit _Functions.psm1 to modify data transformation methods and error responses
 
 # Upgrades
 To upgrade when a new version is released:
