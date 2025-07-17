@@ -75,7 +75,7 @@ function b64enc {
 
 function Remove-FileLock {
     param(
-        [string]$LockFileStream
+        $LockFileStream
     )
     $LockFileStream.Close()
     $LockFileStream.Dispose()
@@ -408,13 +408,25 @@ $ReturnCode = 0
 # Delete old logs
 
 $MaxLogSize = 0.5 * 1024 * 1024
-$LogSize = (Get-Item $LogFile).Length
+If (Test-Path $LogFile) {
+    $LogSize = (Get-Item $LogFile).Length
+}
+else {
+    $LogSize = 0
+}
 If ($LogSize -gt $MaxLogSize) {
     $DateStamp = Get-Date -Format yyyy-MM-dd_hh-mm-ss
     $NewLogFileName = (($LogFile -Replace "\.log", "") + "_" + $DateStamp + ".log")
     Rename-Item -Path $LogFile -NewName $NewLogFileName
 }
-$OlderLogs = Get-ChildItem $LogDirectory | Sort-Object -Property LastWriteTime -Descending | Select-Object -Skip 5
+
+If (Test-Path $LogDirectory) {
+    $OlderLogs = Get-ChildItem $LogDirectory | Sort-Object -Property LastWriteTime -Descending | Select-Object -Skip 5
+}
+else {
+    $OlderLogs = @()
+}
+
 If ($OlderLogs) {
     Write-Host ("removing logs " -f $OlderLogs.FullName)
     try {
