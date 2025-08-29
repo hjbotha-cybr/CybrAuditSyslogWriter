@@ -50,7 +50,7 @@ The scheduled task will return one of the following error codes in specific situ
 | 2           | Failed to create the state directory specified in config.ini                                                                                                                |
 | 3           | Failed to decrypt the password set in ServiceUserPasswordEncrypted. Will occur if the password was encrypted by a user which is different from the user running the script. |
 | 4           | Failed to create the lock file in the state directory                                                                                                                       |
-| 5           | Non-fatal errors occurred during execution. Review logs for details.                                                                                                        |
+| 5           | Initialisation completed successfully, but errors occurred during execution, and logs were not sent to Syslog. Review logs for details.                                     |
 
 ### Normal return codes
 
@@ -66,7 +66,7 @@ This section contains mostly the same information as `Config.example.ini` and is
 The URL of your Identity tenant in format `https://_IdentityTenantID_.id.cyberark.cloud`. This is the URL shown at the login page for your CyberArk tenant.
 
 ## ServiceUserUsername
-The username of an "OAuth2 Confidential Client" user created in Identity Administration (Core Services -> Users -> Add User -> Select "Is OAuth confidential client")
+The username of an "OAuth2 Confidential Client" user created in Identity Administration (Core Services -> Users -> Add User -> Select "Is OAuth confidential client").
 
 ## OAuth2ServerAppID
 The "Application ID" of the "OAuth2 Server" type app created in Identity Administration -> Apps -> Web Apps -> Add Web Apps -> Custom -> OAuth2 Server.
@@ -94,7 +94,7 @@ The password of that user in plain text. This will be automatically encrypted th
 Encrypted passwords can only be decrypted by the user that encrypted it.
 
 ## SyslogReceiverAddress
-The hostname and port of your Syslog Receiver
+The hostname and port of your Syslog Receiver.
 
 ## SyslogReceiverProtocol
 The protocol of your Syslog Receiver.
@@ -106,7 +106,7 @@ Valid values are:
 | tcps  | TCP stream encrypted with TLS 1.2 |
 
 ## SyslogReceiverCertValidation
-Whether to validate the identity of a TLS receiver.
+Whether to validate the identity of a TLS receiver. Enabled by default.
 
 ## StateDir
 The directory where the script will store its current state between executions.
