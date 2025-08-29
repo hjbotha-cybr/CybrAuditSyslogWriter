@@ -94,7 +94,7 @@ The password of that user in plain text. This will be automatically encrypted th
 Encrypted passwords can only be decrypted by the user that encrypted it.
 
 ## SyslogReceiverAddress
-The hostname and port of your Syslog Receiver (Currently only supports plain text TCP)
+The hostname and port of your Syslog Receiver
 
 ## SyslogReceiverProtocol
 The protocol of your Syslog Receiver.
